@@ -6,10 +6,19 @@ import axios from 'axios';
 // Connect to the backend Socket.IO server
 const socket = io('http://localhost:5000');
 
+type Tmessage = {
+  username: string;
+  content: string;
+}
+
 const App = () => {
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState<Tmessage[]>([]);
   const [username, setUsername] = useState('');
   const [content, setContent] = useState('');
+
+  const [typingIndicator, setTypingIndicator] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  let typingTimeout: number
 
   // // Load initial messages
   // useEffect(() => {
@@ -36,12 +45,17 @@ const App = () => {
       
       setMessages((prevMessages) => [...prevMessages, newMessage]);
     });
+
+    socket.on('userTyping', (message) => {
+      setTypingIndicator(message);
+    });
   
     // Cleanup function
     return () => {  
       // Remove event listeners when the component unmounts          
       socket.off('broadcastMessage');          
       socket.off('loadMessages');
+      socket.off('userTyping');
     };
   }, []);
   
@@ -52,6 +66,21 @@ const App = () => {
     const message = { username, content };
     socket.emit('newMessage', message); // Emit message to server
     setContent(''); // Clear input field
+    socket.emit('stopTyping'); // Notify server that user stopped typing
+  };
+
+
+  const handleTyping = () => {
+    if (!isTyping) {
+      setIsTyping(true);
+      socket.emit('typing', username); // Emit typing event to server
+    }
+
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+      setIsTyping(false);
+      socket.emit('stopTyping'); // Emit stopTyping event to server
+    }, 3000); // User stops typing after 1 second of inactivity
   };
 
   return (
@@ -62,7 +91,9 @@ const App = () => {
           type="text"
           placeholder="Username"
           value={username}
-          onChange={(e) => setUsername(e.target.value)}
+          onChange={(e) => {
+            setUsername(e.target.value);
+          }}
         />
       </div>
       <div style={{ marginBottom: '10px' }}>
@@ -70,7 +101,8 @@ const App = () => {
           type="text"
           placeholder="Message"
           value={content}
-          onChange={(e) => setContent(e.target.value)}
+          onChange={(e) => {setContent(e.target.value);
+                         handleTyping();}}
         />
         <button onClick={handleSendMessage}>Send</button>
       </div>
@@ -84,6 +116,9 @@ const App = () => {
             </li>
           ))}
         </ul>
+      </div>
+      <div>
+        <h3>{typingIndicator}</h3>
       </div>
     </div>
   );

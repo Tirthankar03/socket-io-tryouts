@@ -39,7 +39,7 @@ const Message = mongoose.model('Message', messageSchema);
 io.on('connection', async (socket) => {
   console.log('User connected:', socket.id);
 
-  const messages = await Message.find()
+  const messages = await Message.find() 
 
   // Emit previous messages
   console.log('loading previous messages and sending to the client>>>>');
@@ -54,6 +54,19 @@ io.on('connection', async (socket) => {
     
     io.emit('broadcastMessage', savedMessage); // Broadcast to all connected clients
   });
+
+
+    // Listen for typing event
+    socket.on('typing', (username) => {
+      socket.broadcast.emit('userTyping', `${username} is typing...`);
+    });
+
+
+      // Listen for stop typing event
+  socket.on('stopTyping', () => {
+    socket.broadcast.emit('userTyping', ''); // Clear typing indicator
+  });
+
 
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
