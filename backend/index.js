@@ -35,8 +35,44 @@ const messageSchema = new mongoose.Schema({
 });
 const Message = mongoose.model('Message', messageSchema);
 
+let videoQueue = [];
+
 // Socket.IO logic
 io.on('connection', async (socket) => {
+
+
+    // Send current video queue to the client
+    socket.emit('videoQueue', videoQueue);
+
+    // Add a new video to the queue
+    socket.on('addVideo', (video) => {
+      videoQueue.push({ ...video, votes: 0 });
+      io.emit('videoQueue', videoQueue);
+    });
+
+
+
+
+  // Handle upvotes
+  socket.on('upvote', (videoId) => {
+    const video = videoQueue.find((v) => v.id === videoId);
+    if (video) {
+      video.votes += 1;
+      io.emit('videoQueue', videoQueue);
+    }
+  });
+
+
+    // Handle downvotes
+    socket.on('downvote', (videoId) => {
+      const video = videoQueue.find((v) => v.id === videoId);
+      if (video) {
+        video.votes -= 1;
+        io.emit('videoQueue', videoQueue);
+      }
+    });
+
+
   console.log('User connected:', socket.id);
 
   const messages = await Message.find() 

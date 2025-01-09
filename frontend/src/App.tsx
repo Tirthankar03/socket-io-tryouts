@@ -18,6 +18,12 @@ const App = () => {
 
   const [typingIndicator, setTypingIndicator] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+
+
+  const [videoQueue, setVideoQueue] = useState([]);
+  const [videoUrl, setVideoUrl] = useState('');
+
+
   let typingTimeout: number
 
   // // Load initial messages
@@ -34,6 +40,13 @@ const App = () => {
   // }, []);
 
   useEffect(() => {
+
+    // Listen for video queue updates
+    socket.on('videoQueue', (queue) => {
+      setVideoQueue(queue);
+    });
+
+
     // Listen for events from the server
     socket.on('loadMessages', (loadedMessages) => {
       console.log('previous messages>>>', loadedMessages)
@@ -56,6 +69,7 @@ const App = () => {
       socket.off('broadcastMessage');          
       socket.off('loadMessages');
       socket.off('userTyping');
+      socket.off('videoQueue')
     };
   }, []);
   
@@ -83,6 +97,33 @@ const App = () => {
     }, 3000); // User stops typing after 1 second of inactivity
   };
 
+
+  const handleAddVideo = () => {
+    const videoId = extractVideoId(videoUrl);
+    if (!videoId) return alert('Invalid YouTube URL');
+
+    const video = {
+      id: videoId,
+      url: `https://www.youtube.com/embed/${videoId}`,
+    };
+    socket.emit('addVideo', video);
+    setVideoUrl('');
+  };
+
+  const extractVideoId = (url) => {
+    const match = url.match(/(?:v=|\/)([0-9A-Za-z_-]{11})/);
+    return match ? match[1] : null;
+  };
+
+  const handleUpvote = (videoId) => {
+    socket.emit('upvote', videoId);
+  };
+
+  const handleDownvote = (videoId) => {
+    socket.emit('downvote', videoId);
+  };
+
+
   return (
     <div style={{ padding: '20px' }}>
       <h1>Chat Application</h1>
@@ -96,6 +137,40 @@ const App = () => {
           }}
         />
       </div>
+      <div>
+      <h1>Shared Video Queue</h1>
+      <input
+        type="text"
+        placeholder="Paste YouTube URL"
+        value={videoUrl}
+        onChange={(e) => setVideoUrl(e.target.value)}
+      />
+      <button onClick={handleAddVideo}>Add Video</button>
+
+      <h2>Video Queue</h2>
+      <ul>
+        {videoQueue
+          .sort((a, b) => b.votes - a.votes)
+          .map((video) => (
+            <li key={video.id}>
+              <iframe
+                src={video.url}
+                frameBorder="0"
+                allow="autoplay; encrypted-media"
+                allowFullScreen
+                title={video.id}
+                width="300"
+                height="200"
+              ></iframe>
+              <div>
+                Votes: {video.votes}{' '}
+                <button onClick={() => handleUpvote(video.id)}>Upvote</button>
+                <button onClick={() => handleDownvote(video.id)}>Downvote</button>
+              </div>
+            </li>
+          ))}
+      </ul>
+    </div>
       <div style={{ marginBottom: '10px' }}>
         <input
           type="text"
